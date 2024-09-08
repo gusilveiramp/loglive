@@ -42,5 +42,5 @@ Contributions are welcome! If you would like to contribute, please fork the repo
 Distributed under the MIT License. See `LICENSE` for more information.
 
 
-# TODO
-[] - Should work for imported functions
+## TODO
+[ ] - Should work for imported functions
