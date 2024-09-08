@@ -43,4 +43,5 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 
 ## TODO
+✅ Should work for nested functions
 ⬜️ Should work for imported functions
