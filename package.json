@@ -1,0 +1,70 @@
+{
+  "name": "loglive",
+  "displayName": "LogLive",
+  "description": "LogLive is a Visual Studio Code extension that evaluates JavaScript and TypeScript expressions in real time, displaying the results directly as comments in the code. Ideal for developers who want instant feedback on expressions without running entire scripts.",
+  "version": "0.0.1",
+  "publisher": "gusilveiramp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gusilveiramp/loglive-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/gusilveiramp/loglive-extension/issues"
+  },
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "workspaceContains:**/*.js",
+    "workspaceContains:**/*.ts"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "loglive.activate",
+        "title": "Activate LogLive"
+      }
+    ],
+    "configuration": {
+      "title": "LogLive Exntesion",
+      "properties": {
+        "loglive.showAllExpressions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the result of all expressions in the code. If disabled, it will only be displayed for console.log."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@babel/parser": "^7.25.6",
+    "@babel/traverse": "^7.25.6",
+    "@types/babel__traverse": "^7.20.6",
+    "@types/mocha": "^10.0.7",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.92.0",
+    "@typescript-eslint/eslint-plugin": "^8.3.0",
+    "@typescript-eslint/parser": "^8.3.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.9.1",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "vm2": "^3.9.19"
+  }
+}
