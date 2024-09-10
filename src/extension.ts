@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import * as parser from '@babel/parser'; // Usado para converter o código fonte em uma arvore de sintaxe abstrata (AST)
 import traverse from '@babel/traverse'; // Usado para percorrer a AST e executar ações com base nos nós
-
+import fs from 'node:fs';
+import path from 'node:path';
+ 
 // Variável para armazenar os objetos de decoração que serão exibidos no editor
 let decorations: vscode.TextEditorDecorationType[] = [];
 // Objeto usado para armazenar variáveis e funções globais do código que o usuário está editando
@@ -34,6 +36,30 @@ export function activate(context: vscode.ExtensionContext) {
                 plugins: ['typescript']
             });
 
+            console.log("ast", ast);
+            console.log("text", text);
+
+            traverse(ast, {
+                ImportDeclaration(filePath) {
+                    const importPath = filePath.node.source.value; // Caminho do arquivo importado
+                    const documentPath = document.uri.fsPath;
+                    const resolvedPath = resolveImportPath(importPath, documentPath);
+
+                    if (resolvedPath && fs.existsSync(resolvedPath)) {
+                        const fileContent = fs.readFileSync(resolvedPath, 'utf-8');
+                        const importAst = parser.parse(fileContent, {
+                            sourceType: 'module',
+                            plugins: ['typescript']
+                        });
+                        
+                        console.log("importAst", importAst);
+                        console.log("fileContent", fileContent);
+
+                        populateGlobalScope(importAst, fileContent);
+                    }
+                }
+            });
+
             // preenche o escopo global com funções e variáveis definidas no código
             populateGlobalScope(ast, text);
             // avalia as expressões encontradas no código e exibe os resultados no editor
@@ -45,6 +71,22 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposable);
 }
 
+// Função para resolver o caminho do arquivo importado
+function resolveImportPath(importPath: string, documentPath: string): string | null {
+    const directory = path.dirname(documentPath); // Pega o diretório do arquivo atual
+    const extensions = ['.ts', '.js', '.tsx', '.jsx']; // Extensões que podemos procurar
+
+    for (const ext of extensions) {
+        const fullPath = path.join(directory, `${importPath}${ext}`);
+        console.log('FULL PATH', fullPath);
+        if (fs.existsSync(fullPath)) {
+            return fullPath;
+        }
+    }
+    return null;
+}
+
+
 // Função para limpar as docorações que foram inseridas anteriormente
 function clearDecorations(editor: vscode.TextEditor) {
     // remove todas as decorações do editor
@@ -54,14 +96,29 @@ function clearDecorations(editor: vscode.TextEditor) {
 
 // Função para preencher o escopo global com variáveis e funções definidas no código do usuário
 export function populateGlobalScope(ast: any, code: string) {
-	traverse(ast, {
+    traverse(ast, {
         enter(path) {
-            // se o nó for uma declaração de função ou uma declação de variável
             if ((path.isFunctionDeclaration() || path.isVariableDeclarator()) && path.node.id && path.node.id.type === 'Identifier') {
-                const name = path.node.id.name; // obtém o nome da função ou variável
-                const declarationCode = code.substring(path.node.start!, path.node.end!); // pega o código fonte da declaração
-                // adiciona a função ou variável ao escopo global, avaliando a declaração
-                globalScope[name] = new Function(`return (${declarationCode})`)();
+                const name = path.node.id.name;
+                let declarationCode = code.substring(path.node.start!, path.node.end!);
+
+                // Remove TypeScript type annotations (this is a simplified regex)
+                declarationCode = declarationCode.replace(/: [\w\[\]\|]+/g, '');
+
+                console.log(`Populating global scope with ${name}: ${declarationCode}`);
+                
+                try {
+                    if (!globalScope[name]) {
+                        globalScope[name] = new Function(`return (${declarationCode})`)();
+                        console.log(`Successfully added ${name} to globalScope`);
+                    } else {
+                        console.log(`${name} already exists in global scope`);
+                    }
+                } catch (error) {
+                    console.error(`Error adding ${name} to globalScope: ${error}`);
+                }
+
+                console.log("Global scope after population:", globalScope);
             }
         }
     });
@@ -70,28 +127,35 @@ export function populateGlobalScope(ast: any, code: string) {
 // Função que avalia as expressões encontradas no código e insere o resultado no editor
 function evaluateExpressions(ast: any, editor: vscode.TextEditor, document: vscode.TextDocument) {
     const showAllExpressions = vscode.workspace.getConfiguration().get<boolean>('loglive.showAllExpressions');
+    console.log("Evaluating expressions, showAllExpressions:", showAllExpressions);
 
     // Percorre a AST em busca de expressões
     traverse(ast, {
         // verifica se o nó é uma expressão
         ExpressionStatement(path) { 
+            console.log("ExpressionStatement found:", path.node);
             if (showAllExpressions) { // se a configuração estiver ativada
                 if (path.node.expression) {
                     // gera o código para a expressão atual
                     const expressionCode = generateCodeForNode(path.node.expression, document);
+                    console.log("ExpressionStatement found:", path.node);
+                    console.log("Generated expression code:", expressionCode);
                     try {
                         // avalia a expressão no contexto do escopo global
                         const result = new Function('globalScope', `with(globalScope) { return ${expressionCode}; }`)(globalScope);
+                        console.log("Evaluated result:", result);
                         // insere o resultao da avaliação no editor
                         insertResultDecoration(path.node, editor, document, result);
                     } catch (err) {
-                        console.error(`Erro ao avaliar expressão: ${err}`);
+                        console.error(`Erro ao avaliar expressão ${expressionCode}: ${err}`);
+
                     }
                 }
             }
         },
         // Verifica se o nó é uma chamada de console.log
         CallExpression(path) {
+            console.log("CallExpression found:", path.node);
             if (path.node.callee.type === 'MemberExpression' &&
                 path.node.callee.object.type === 'Identifier' &&
                 path.node.callee.object.name === 'console' &&
@@ -102,6 +166,7 @@ function evaluateExpressions(ast: any, editor: vscode.TextEditor, document: vsco
                 try {
                     // avalia os argumentos da chamada no escopo global
                     const result = new Function('globalScope', `with(globalScope) { return ${argumentCode}; }`)(globalScope);
+                    console.log("Console.log result:", result);
                     // insere o resultado da avaliação no editor
                     insertResultDecoration(path.node, editor, document, result);
                 } catch (err) {
@@ -126,6 +191,7 @@ function generateCodeForNode(node: any, document: vscode.TextDocument): string {
 
 // Função para inserir uma decoração (resultado da expressão) no editor
 function insertResultDecoration(node: any, editor: vscode.TextEditor, document: vscode.TextDocument, result: any) {
+    console.log("Inserting decoration for expression:", result);
 	if (result !== undefined) { // se houver um resultado
 		const startLine = node.loc?.start.line; // linha onde a expressão está localizada
 		const line = (startLine ? startLine - 1 : 0);
