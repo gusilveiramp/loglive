@@ -44,4 +44,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## TODO
 ✅ Should work for nested functions<br/>
-⬜️ Should work for imported functions
+✅ Should work for imported functions<br/>
+✅ Should work for all expressions<br/>
+✅ Should work for variables<br/>
