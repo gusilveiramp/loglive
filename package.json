@@ -48,7 +48,9 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "package": "npx vsce package",
+    "install": "code --install-extension loglive-0.0.1.vsix"
   },
   "devDependencies": {
     "@babel/parser": "^7.25.6",
